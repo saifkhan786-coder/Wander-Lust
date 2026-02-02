@@ -5,6 +5,8 @@ const Listing = require("./models/listing.js");
 const path = require("path");
 const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
+const wrapAsync = require("./utils/wrapAsync.js");
+const ExpressError = require("./utils/ExpressError.js");
 
 app.get("/", (req, res) => {
     res.send("i am a root");
@@ -64,11 +66,11 @@ app.get("/listings/:id", async(req, res) => {
     res.render("listings/show.ejs", {listing});
 });
 
-app.post("/listings", async(req, res) => {
-    const newListing = new Listing(req.body.listing);
-    await newListing.save();
-    res.redirect("/listings");
-});
+app.post("/listings", wrapAsync(async(req, res, next) => {  
+        const newListing = new Listing(req.body.listing);
+        await newListing.save();
+        res.redirect("/listings");
+}));
 
 app.get("/listings/:id/edit", async(req, res) => {
     let {id} = req.params;
@@ -86,6 +88,17 @@ app.delete("/listings/:id", async(req, res) => {
     let {id} = req.params;
     await Listing.findByIdAndDelete(id);
     res.redirect("/listings");
+});
+
+// 404 handler (ALWAYS after all routes)
+app.use((req, res, next) => {
+    next(new ExpressError(404, "page not found"));
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    let { status = 500, message = "Something went wrong" } = err;
+    res.status(status).send(message);
 });
 
 app.listen(8080, () => {
